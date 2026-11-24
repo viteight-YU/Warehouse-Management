@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>大峯牧場｜牧場藥品與疫苗互動式倉儲系統</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Sans+Thai:wght@400;600;700&display=swap');
+    body {
+      font-family: 'Noto Sans TC', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f1f5f9;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-active {
+      background-color: #0f766e;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(15, 118, 110, 0.35);
+    }
+    .btn-press:active {
+      transform: scale(0.96);
+    }
+    /* Custom scrollbar for category chips */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="text-slate-800 pb-24">
+
+  <!-- Top Header -->
+  <header class="bg-teal-800 text-white sticky top-0 z-30 shadow-md">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="bg-teal-600 text-xs font-bold px-2 py-0.5 rounded">大峯牧場</span>
+          <span id="offline-badge" class="bg-emerald-500/20 border border-emerald-300/40 text-emerald-100 text-[11px] px-2 py-0.5 rounded-full">
+            ● 本地即時儲存
+          </span>
+        </div>
+        <h1 id="app-title" class="text-lg sm:text-xl font-extrabold tracking-tight mt-0.5">
+          牧場藥品與疫苗倉儲管理系統
+        </h1>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="toggleLang()" id="lang-btn"
+          class="btn-press bg-white text-teal-900 font-bold text-xs sm:text-sm px-3 py-2 rounded-xl shadow flex items-center gap-1.5 border border-teal-200">
+          <span>🇹🇼/🇹🇭</span>
+          <span id="lang-label">ภาษาไทย</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-teal-900/90 border-t border-teal-700/60">
+      <div class="max-w-5xl mx-auto px-3 py-2 grid grid-cols-4 gap-1.5 text-center text-xs sm:text-sm font-bold">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn tab-active py-2 px-1 rounded-lg transition">
+          📦 <span data-i18n="nav_dashboard">庫存總覽</span>
+        </button>
+        <button onclick="switchTab('out')" id="tab-out" class="tab-btn text-teal-100 hover:bg-teal-800 py-2 px-1 rounded-lg transition">
+          📤 <span data-i18n="nav_out">現場領用</span>
+        </button>
+        <button onclick="switchTab('in')" id="tab-in" class="tab-btn text-teal-100 hover:bg-teal-800 py-2 px-1 rounded-lg transition">
+          📥 <span data-i18n="nav_in">採購入庫</span>
+        </button>
+        <button onclick="switchTab('logs')" id="tab-logs" class="tab-btn text-teal-100 hover:bg-teal-800 py-2 px-1 rounded-lg transition">
+          📋 <span data-i18n="nav_logs">異動紀錄</span>
+        </button>
+      </div>
+    </nav>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-3 sm:px-4 pt-4">
+
+    <!-- KPI Summary Bar -->
+    <section class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+      <div onclick="filterByAlert('all')" class="cursor-pointer bg-white p-3 rounded-2xl shadow-sm border border-slate-200 hover:border-teal-400 transition">
+        <div class="text-xs text-slate-500 font-medium" data-i18n="kpi_total_sku">建檔品項總數</div>
+        <div class="text-2xl font-black text-slate-800 mt-0.5" id="kpi-sku">90</div>
+        <div class="text-[11px] text-teal-600 font-semibold mt-0.5" data-i18n="kpi_six_cats">6 大分類完整建檔</div>
+      </div>
+      <div onclick="filterByAlert('low')" class="cursor-pointer bg-white p-3 rounded-2xl shadow-sm border border-rose-200 hover:border-rose-400 transition">
+        <div class="text-xs text-rose-600 font-bold" data-i18n="kpi_low_stock">⚠️ 低於安全庫存</div>
+        <div class="text-2xl font-black text-rose-600 mt-0.5" id="kpi-low">0</div>
+        <div class="text-[11px] text-slate-500 mt-0.5" data-i18n="kpi_click_filter">點擊篩選需叫貨品項</div>
+      </div>
+      <div onclick="filterByAlert('expiring')" class="cursor-pointer bg-white p-3 rounded-2xl shadow-sm border border-amber-200 hover:border-amber-400 transition">
+        <div class="text-xs text-amber-700 font-bold" data-i18n="kpi_expiring">⏳ 30天內即期批號</div>
+        <div class="text-2xl font-black text-amber-600 mt-0.5" id="kpi-exp">0</div>
+        <div class="text-[11px] text-slate-500 mt-0.5" data-i18n="kpi_fifo_hint">優先領用避免報廢</div>
+      </div>
+      <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+        <div class="text-xs text-slate-500 font-medium" data-i18n="kpi_staff_count">建檔領用人員</div>
+        <div class="text-2xl font-black text-teal-700 mt-0.5" id="kpi-staff">22</div>
+        <div class="text-[11px] text-slate-500 mt-0.5" data-i18n="kpi_staff_sub">已匯入員工名單</div>
+      </div>
+    </section>
+
+    <!-- VIEW 1: DASHBOARD -->
+    <section id="view-dashboard" class="space-y-3">
+      <!-- Search & Alert Filter -->
+      <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 space-y-2.5">
+        <div class="flex flex-col sm:flex-row gap-2">
+          <div class="relative flex-1">
+            <input type="text" id="search-input" oninput="renderInventory()"
+              placeholder="搜尋品名、編號（如 PRRS、信福、鐵球寧、VAC-001）..."
+              class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            <span class="absolute left-3 top-2.5 text-slate-400">🔍</span>
+          </div>
+          <div class="flex gap-1.5">
+            <button onclick="toggleAlertOnly()" id="alert-only-btn"
+              class="btn-press px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-slate-50 text-slate-700 whitespace-nowrap">
+              🚨 <span data-i18n="btn_alert_only">僅看警示品項</span>
+            </button>
+            <button onclick="openStocktakeModal()"
+              class="btn-press px-3 py-2 rounded-xl text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200 whitespace-nowrap">
+              📝 <span data-i18n="btn_quick_init">快速盤點修正</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 6 Category Filter Pills -->
+        <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1" id="cat-pills">
+          <!-- Generated by JS -->
+        </div>
+      </div>
+
+      <!-- Inventory Cards / Table -->
+      <div id="inventory-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- Generated by JS -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: STOCK OUT (現場領用) -->
+    <section id="view-out" class="hidden">
+      <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-4">
+        <div class="border-b border-slate-100 pb-3">
+          <h2 class="text-lg font-extrabold text-rose-700 flex items-center gap-2">
+            <span>📤</span> <span data-i18n="out_title">現場藥品／疫苗領用登記</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5" data-i18n="out_desc">系統自動依「先進先出（FIFO）」帶出最早到期批號，請選擇領用人與數量。</p>
+        </div>
+
+        <!-- Category Quick Filter for Outbound -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_cat_filter">1. 篩選類別（快速縮小範圍）</label>
+          <select id="out-cat-select" onchange="populateItemDropdown('out')"
+            class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+          </select>
+        </div>
+
+        <!-- Item Select -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_select_item">2. 選擇領用藥品／疫苗（共 90 項）</label>
+          <select id="out-item-select" onchange="onOutItemChange()"
+            class="w-full p-3 bg-white border-2 border-teal-600 rounded-xl text-sm font-bold text-slate-900">
+          </select>
+        </div>
+
+        <!-- Batch Select (FIFO) -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_select_batch">3. 選擇批號與效期（已依到期日排序）</label>
+          <select id="out-batch-select" onchange="updateOutMaxHint()"
+            class="w-full p-3 bg-amber-50/60 border border-amber-300 rounded-xl text-sm font-semibold text-slate-800">
+          </select>
+          <div id="out-stock-hint" class="text-xs font-bold text-teal-700 mt-1"></div>
+        </div>
+
+        <!-- Quantity Stepper -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5" data-i18n="label_qty">4. 領用數量</label>
+          <div class="grid grid-cols-5 gap-2 items-center">
+            <button type="button" onclick="adjustQty('out-qty', -5)" class="btn-press py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-base">-5</button>
+            <button type="button" onclick="adjustQty('out-qty', -1)" class="btn-press py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-base">-1</button>
+            <input type="number" id="out-qty" value="1" min="0.1" step="any"
+              class="w-full py-2.5 text-center text-xl font-black border-2 border-slate-300 rounded-xl bg-white" />
+            <button type="button" onclick="adjustQty('out-qty', 1)" class="btn-press py-3 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-xl font-black text-base">+1</button>
+            <button type="button" onclick="adjustQty('out-qty', 5)" class="btn-press py-3 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-xl font-black text-base">+5</button>
+          </div>
+        </div>
+
+        <!-- Employee & Barn/Usage -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_staff">5. 領用人員（員工名單 22 人）</label>
+            <select id="out-staff-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_target_barn">6. 使用棟舍／用途備註</label>
+            <select id="out-barn-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+              <option value="分娩舍">分娩舍 (Farrowing)</option>
+              <option value="配種懷孕舍">配種懷孕舍 (Gestation)</option>
+              <option value="保育舍">保育舍 (Nursery)</option>
+              <option value="肉豬舍">肉豬舍 (Finishing)</option>
+              <option value="公豬精液室">公豬精液室 (AI Lab)</option>
+              <option value="全場防疫消毒">全場防疫消毒 (Biosecurity)</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="submitOutbound()"
+          class="btn-press w-full py-4 bg-rose-600 hover:bg-rose-700 text-white font-black text-base rounded-2xl shadow-lg transition">
+          ✅ <span data-i18n="btn_confirm_out">確認領用並扣減庫存</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 3: STOCK IN (採購入庫) -->
+    <section id="view-in" class="hidden">
+      <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-4">
+        <div class="border-b border-slate-100 pb-3">
+          <h2 class="text-lg font-extrabold text-teal-800 flex items-center gap-2">
+            <span>📥</span> <span data-i18n="in_title">藥品／疫苗採購入庫登記</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-0.5" data-i18n="in_desc">登錄新進貨批號與有效期限，系統將自動納入先進先出效期追蹤。</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_cat_filter">1. 篩選類別</label>
+          <select id="in-cat-select" onchange="populateItemDropdown('in')"
+            class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_select_item">2. 選擇入庫品項</label>
+          <select id="in-item-select" onchange="updateInUnitHint()"
+            class="w-full p-3 bg-white border-2 border-teal-600 rounded-xl text-sm font-bold text-slate-900">
+          </select>
+          <div id="in-unit-hint" class="text-xs font-bold text-teal-700 mt-1"></div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_batch_no">3. 廠商批號 (Lot No.)</label>
+            <input type="text" id="in-batch" placeholder="例如：LOT-202611A"
+              class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold uppercase" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_expiry">4. 有效期限 (Expiry Date)</label>
+            <input type="date" id="in-expiry"
+              class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1.5" data-i18n="label_in_qty">5. 入庫數量</label>
+          <div class="grid grid-cols-5 gap-2 items-center">
+            <button type="button" onclick="adjustQty('in-qty', -10)" class="btn-press py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-base">-10</button>
+            <button type="button" onclick="adjustQty('in-qty', -1)" class="btn-press py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-black text-base">-1</button>
+            <input type="number" id="in-qty" value="10" min="0.1" step="any"
+              class="w-full py-2.5 text-center text-xl font-black border-2 border-slate-300 rounded-xl bg-white" />
+            <button type="button" onclick="adjustQty('in-qty', 1)" class="btn-press py-3 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-xl font-black text-base">+1</button>
+            <button type="button" onclick="adjustQty('in-qty', 10)" class="btn-press py-3 bg-teal-100 hover:bg-teal-200 text-teal-900 rounded-xl font-black text-base">+10</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_in_staff">6. 驗收人員</label>
+            <select id="in-staff-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-600 mb-1" data-i18n="label_in_type">7. 入庫性質</label>
+            <select id="in-type-select" class="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold">
+              <option value="一般採購">一般採購正貨</option>
+              <option value="廠商贈送/回饋">廠商贈送／回饋</option>
+              <option value="試驗樣品">試驗樣品</option>
+              <option value="期初盤點建帳">期初盤點建帳</option>
+            </select>
+          </div>
+        </div>
+
+        <button onclick="submitInbound()"
+          class="btn-press w-full py-4 bg-teal-700 hover:bg-teal-800 text-white font-black text-base rounded-2xl shadow-lg transition">
+          📥 <span data-i18n="btn_confirm_in">確認入庫並增加庫存</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- VIEW 4: TRANSACTION LOGS (異動紀錄) -->
+    <section id="view-logs" class="hidden space-y-3">
+      <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-base font-extrabold text-slate-800" data-i18n="logs_title">出入庫異動流水帳</h2>
+          <p class="text-xs text-slate-500" data-i18n="logs_desc">所有操作皆儲存於本機，可隨時匯出 Excel 相容 CSV 報表。</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="exportCSV()" class="btn-press px-3.5 py-2 bg-emerald-700 text-white text-xs font-bold rounded-xl shadow">
+            📊 <span data-i18n="btn_export_csv">匯出 CSV 報表</span>
+          </button>
+          <button onclick="resetDemoData()" class="btn-press px-3 py-2 bg-slate-200 text-slate-700 text-xs font-bold rounded-xl">
+            🔄 <span data-i18n="btn_reset">重置預設值</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="logs-container" class="space-y-2">
+        <!-- Generated by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Quick Stocktake Modal -->
+  <div id="stocktake-modal" class="fixed inset-0 bg-slate-900/60 z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-extrabold text-base text-slate-800">📝 現場盤點快速調整</h3>
+        <button onclick="closeStocktakeModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+      <p class="text-xs text-slate-500">選擇品項與批號後，直接輸入現場實際盤點數量，系統將自動覆寫並產生一筆「盤點修正」紀錄。</p>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">選擇品項</label>
+        <select id="st-item-select" onchange="onStItemChange()" class="w-full p-2.5 border rounded-xl text-sm font-bold"></select>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">選擇批號</label>
+        <select id="st-batch-select" class="w-full p-2.5 border rounded-xl text-sm font-bold"></select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">實際盤點數量</label>
+          <input type="number" id="st-qty" min="0" step="any" class="w-full p-2.5 border-2 border-teal-600 rounded-xl text-base font-black text-center" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">盤點人員</label>
+          <select id="st-staff-select" class="w-full p-2.5 border rounded-xl text-sm font-bold"></select>
+        </div>
+      </div>
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeStocktakeModal()" class="flex-1 py-2.5 bg-slate-200 rounded-xl font-bold text-sm">取消</button>
+        <button onclick="submitStocktake()" class="flex-1 py-2.5 bg-teal-700 text-white rounded-xl font-bold text-sm">儲存盤點結果</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm font-bold px-5 py-3 rounded-2xl shadow-xl opacity-0 pointer-events-none transition-opacity duration-300 z-50">
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. MASTER DATA FROM UPLOADED EXCEL FILES
+    // ==========================================
+    const EMPLOYEES = ["周豐益", "李昭和", "吳健誌", "彩鳳", "林冠群", "王淑敏", "劉瑞珍", "李合豐", "林柏穎", "廖和盛", "李培豫", "阿瑞", "石美珍", "莊文祥", "石埕嘉", "劉家逸", "卓姿妙", "陳郁元", "陳自強", "鄭清華", "阿秋", "阿秀"];
+
+    const MASTER_ITEMS = [{"id": "VAC-001", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "Fostera PRRS 50劑型", "nameTh": "วัคซีน PRRS (Fostera 50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-002", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "雙效萎縮性鼻炎疫苗 AR-25# (25劑/瓶)", "nameTh": "วัคซีนโรคโพรงจมูกอักเสบติดต่อ AR-25#", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-003", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "大腸桿菌三價疫苗 腸三價-25# (25劑/瓶)", "nameTh": "วัคซีนอีโคไล 3 สายพันธุ์ (25 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-004", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "副豬嗜血桿菌疫苗 HP (50劑/瓶)", "nameTh": "วัคซีนโรคแกลสเซอร์ HP (50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-005", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "PCVM 100劑型 (環狀+黴漿菌)", "nameTh": "วัคซีนเซอร์โค+ไมโคพลาสมา PCVM 100 โดส", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-006", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "胸膜肺炎放線桿菌疫苗 APP (50劑/瓶)", "nameTh": "วัคซีนปอดอักเสบ APP (50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-007", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "日本腦炎疫苗 JE (10劑/瓶)", "nameTh": "วัคซีนไข้สมองอักเสบเจอี JE (10 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-008", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "Gold PCV MH 金價靈 50劑型", "nameTh": "วัคซีนเซอร์โค Gold PCV MH (50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-009", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "假性狂犬病疫苗 PR50 (50劑/瓶)", "nameTh": "วัคซีนพิษสุนัขบ้าเทียม PR50 (50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-010", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "豬丹毒+小病毒二價疫苗 Ery+Parvo (50劑/瓶)", "nameTh": "วัคซีนไฟลามทุ่ง+พาร์โว Ery+Parvo", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-011", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "豬水腫病基因改造次單位疫苗-50# (50劑/瓶)", "nameTh": "วัคซีนโรคบวมน้ำ (50 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-012", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "豬流行性下痢疫苗 PED", "nameTh": "วัคซีนท้องร่วงติดต่อ PED", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "VAC-013", "cat": "vaccine", "catZh": "疫苗", "catTh": "วัคซีน", "nameZh": "PR 疫苗專用稀釋液", "nameTh": "น้ำยาละลายวัคซีน PR", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-001", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞信福 (Ceftiofur 頭孢噻呋)", "nameTh": "ยาปฏิชีวนะ เซฟติโอเฟอร์ (益瑞信福)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-002", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "肺靈 100ml (Tilmicosin/Tulathromycin)", "nameTh": "ยาแก้ปอดอักเสบ 100ml (肺靈)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-003", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞惜福 (Ceftiofur 懸浮液)", "nameTh": "ยาเซฟติโอเฟอร์ชนิดแขวนตะกอน (益瑞惜福)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-004", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞寶靈 (Amoxicillin 阿莫西林)", "nameTh": "ยาอะม็อกซีซิลลิน (益瑞寶靈)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-005", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "雪肺佳 100ml (Florfenicol)", "nameTh": "ยาฟลอร์เฟนิคอล 100ml (雪肺佳)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-006", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "福樂得 10% 1L (Florfenicol 飲水/拌料)", "nameTh": "ยาฟลอร์เฟนิคอล 10% 1L (福樂得)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-007", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞晶靈 (Gentamicin 健大黴素)", "nameTh": "ยาเจนตามัยซิน (益瑞晶靈)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-008", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "力克爽注射液 100ml (Dexamethasone)", "nameTh": "ยาลดอักเสบ เดกซาเมทาโซน 100ml (力克爽)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-009", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞惜福 25gm 粉劑", "nameTh": "ยาเซฟติโอเฟอร์ผง 25gm (益瑞惜福)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-010", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "特別靈", "nameTh": "ยาฉีด 特別靈", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-011", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益消炎 100ml (消炎鎮痛)", "nameTh": "ยาแก้ปวดลดไข้ 100ml (益消炎)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-012", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞賜得金 (Oxytetracycline 四環素)", "nameTh": "ยาออกซีเตตราไซคลิน (益瑞賜得金)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-013", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "福樂得 30% 注射液 100cc", "nameTh": "ยาฉีดฟลอร์เฟนิคอล 30% 100cc (福樂得)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-014", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "惜福 500ml 大瓶裝", "nameTh": "ยาเซฟติโอเฟอร์ขวดใหญ่ 500ml (惜福)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-015", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "畜舒坦", "nameTh": "ยาฉีด 畜舒坦", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-016", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "嘉畜福", "nameTh": "ยาฉีด 嘉畜福", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-017", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "泰靈 (Tiamulin/Tylosin)", "nameTh": "ยาไทอะมูลิน/ไทโลซิน (泰靈)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-018", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "25% 須如必寧 500cc (解熱鎮痛)", "nameTh": "ยาลดไข้แก้ปวด 500cc (須如必寧)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-019", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "DF 20ml", "nameTh": "ยาฉีด DF 20ml", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-020", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "立可信 30% (Lincomycin 林可黴素)", "nameTh": "ยาลินโคมัยซิน 30% (立可信)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-021", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "畜德福", "nameTh": "ยาฉีด 畜德福", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-022", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "DF 100ml", "nameTh": "ยาฉีด DF 100ml", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-023", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "淋舒好 (Lincomycin+Spectinomycin)", "nameTh": "ยาลินโค-สเปคติโนมัยซิน (淋舒好)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-024", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "益瑞惜福 5gm 粉劑", "nameTh": "ยาเซฟติโอเฟอร์ผง 5gm (益瑞惜福)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-025", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "鐵球寧 (右旋糖酐鐵+Toltrazuril 雙效)", "nameTh": "ธาตุเหล็ก+ยาถ่ายพยาธิบิด (鐵球寧)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-026", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "維保靈 50ml (綜合維他命)", "nameTh": "วิตามินรวม 50ml (維保靈)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-027", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "美牠寶 100ml (維他命代謝劑)", "nameTh": "ยาบำรุงคาโตซาล/วิตามิน B12 100ml (美牠寶)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-028", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "福特助", "nameTh": "ยาบำรุง 福特助", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-029", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "維力潤", "nameTh": "ยาบำรุง 維力潤", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-030", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "通滅 50ml (Doramectin 驅蟲針劑)", "nameTh": "ยาถ่ายพยาธิภายนอก-ภายใน 50ml (通滅)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-031", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "5% 克力糖注射液 500ml (葡萄糖)", "nameTh": "น้ำเกลือกลูโคส 5% 500ml (克力糖)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-032", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "維舍益", "nameTh": "วิตามิน 維舍益", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-033", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "易滅蟲澆滴劑 (外寄生蟲驅蟲)", "nameTh": "ยาราดหลังกำจัดเหาไร (易滅蟲)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-034", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "剋蟲寶", "nameTh": "ยาถ่ายพยาธิ 剋蟲寶", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "INJ-035", "cat": "injection", "catZh": "針劑", "catTh": "ยาฉีด/ยาปฏิชีวนะ", "nameZh": "富樂得", "nameTh": "ยาฉีด 富樂得", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-001", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "先立晶-10", "nameTh": "ยาผงผสมอาหาร 先立晶-10", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-002", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "速治喘 (散劑/預混劑)", "nameTh": "ยาผงแก้หอบ/ทางเดินหายใจ (速治喘)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-003", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "保安生 (益生菌/腸道保健)", "nameTh": "โปรไบโอติกบำรุงลำไส้ (保安生)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-004", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "速治喘 4G", "nameTh": "ยาผงแก้หอบ 速治喘 4G", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-005", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "速新肥 (袋裝)", "nameTh": "สารเสริมเร่งโต 速新肥 (ถุง)", "unitZh": "包", "unitTh": "ถุง", "safetyStock": 20}, {"id": "PWD-006", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "福興", "nameTh": "ยาผง 福興", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-007", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "富必達", "nameTh": "ยาผง 富必達", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 10}, {"id": "PWD-008", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "寶多贊 (大包裝散裝)", "nameTh": "สารเสริม 寶多贊 (กิโลกรัม)", "unitZh": "KG", "unitTh": "กก.", "safetyStock": 500}, {"id": "PWD-009", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "喘咳寧末 (大包裝散裝)", "nameTh": "ยาผงแก้ไอหอบ 喘咳寧末 (กิโลกรัม)", "unitZh": "KG", "unitTh": "กก.", "safetyStock": 500}, {"id": "PWD-010", "cat": "powder", "catZh": "散劑", "catTh": "ยาผง/สารเสริมอาหาร", "nameZh": "速可爽 (袋裝)", "nameTh": "ยาผง 速可爽 (ถุง)", "unitZh": "包", "unitTh": "ถุง", "safetyStock": 20}, {"id": "REP-001", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "Vitasem LD 精液稀釋粉 (1L)", "nameTh": "ผงเจือจางน้ำเชื้อ Vitasem LD (1L)", "unitZh": "包", "unitTh": "ซอง", "safetyStock": 20}, {"id": "REP-002", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "PG600 (5劑/瓶 發情誘導劑)", "nameTh": "ฮอร์โมนเหนี่ยวนำการเป็นสัด PG600 (5 โดส)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 5}, {"id": "REP-003", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "律期媒 (同期發情口服液)", "nameTh": "ฮอร์โมนคุมสัดชนิดกิน (律期媒)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 5}, {"id": "REP-004", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "生得準 (GnRH 排卵促進劑)", "nameTh": "ฮอร์โมนกระตุ้นการตกไข่ GnRH (生得準)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 5}, {"id": "REP-005", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "高效能精液稀釋粉 (1L)", "nameTh": "ผงเจือจางน้ำเชื้อประสิทธิภาพสูง (1L)", "unitZh": "包", "unitTh": "ซอง", "safetyStock": 20}, {"id": "REP-006", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "Durage 超長效精液稀釋粉 (1L)", "nameTh": "ผงเจือจางน้ำเชื้อชนิดออกฤทธิ์นาน Durage (1L)", "unitZh": "包", "unitTh": "ซอง", "safetyStock": 20}, {"id": "REP-007", "cat": "repro", "catZh": "繁殖", "catTh": "ยาระบบสืบพันธุ์/น้ำเชื้อ", "nameZh": "律胎素 10ml (PGF2α 誘導分娩)", "nameTh": "ฮอร์โมนเร่งคลอด PGF2α 10ml (律胎素)", "unitZh": "瓶", "unitTh": "ขวด", "safetyStock": 5}, {"id": "ENV-001", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "滅淨 25L (廣效消毒水)", "nameTh": "น้ำยาฆ่าเชื้อ 滅淨 25L", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "ENV-002", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "滴去霍 25L (消毒水)", "nameTh": "น้ำยาฆ่าเชื้อ 滴去霍 25L", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "ENV-003", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "液鹼 40%~45% (槽車散裝)", "nameTh": "โซดาไฟเหลว 40%~45% (กิโลกรัม)", "unitZh": "KG", "unitTh": "กก.", "safetyStock": 500}, {"id": "ENV-004", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "12% 次氯酸鈉漂白水 (槽車散裝)", "nameTh": "คลอรีนน้ำ 12% (กิโลกรัม)", "unitZh": "KG", "unitTh": "กก.", "safetyStock": 500}, {"id": "ENV-005", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "一錠鼠 (滅鼠餌劑)", "nameTh": "เหยื่อกำจัดหนู 一錠鼠 (กล่อง)", "unitZh": "盒", "unitTh": "กล่อง", "safetyStock": 3}, {"id": "ENV-006", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "鹽酸 (槽車散裝)", "nameTh": "กรดเกลือ (กิโลกรัม)", "unitZh": "KG", "unitTh": "กก.", "safetyStock": 500}, {"id": "ENV-007", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "必滅鼠 50g (滅鼠餌劑)", "nameTh": "เหยื่อกำจัดหนู 必滅鼠 50g (ซอง)", "unitZh": "包", "unitTh": "ซอง", "safetyStock": 20}, {"id": "ENV-008", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "TH4 複合醛類消毒水", "nameTh": "น้ำยาฆ่าเชื้อ TH4", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "ENV-009", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "Antimicrobic Solution 消毒液 3800ml", "nameTh": "น้ำยาฆ่าเชื้อ Antimicrobic 3800ml", "unitZh": "桶", "unitTh": "แกลลอน", "safetyStock": 3}, {"id": "ENV-010", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "界面活性劑 (清洗劑)", "nameTh": "น้ำยาล้างทำความสะอาดโรงเรือน", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "ENV-011", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "保衛靈", "nameTh": "น้ำยาฆ่าเชื้อ 保衛靈", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "ENV-012", "cat": "env", "catZh": "環境", "catTh": "น้ำยาฆ่าเชื้อ/สิ่งแวดล้อม", "nameZh": "一般消毒水 25L", "nameTh": "น้ำยาฆ่าเชื้อทั่วไป 25L", "unitZh": "桶", "unitTh": "ถัง", "safetyStock": 3}, {"id": "SUP-001", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "鐵球寧專用連續注射器", "nameTh": "กระบอกฉีดยาออโต้สำหรับ 鐵球寧", "unitZh": "支", "unitTh": "อัน", "safetyStock": 3}, {"id": "SUP-002", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "18G x 1-1/2\" 塑膠座針頭", "nameTh": "เข็มฉีดยา 18G x 1-1/2\" (กล่อง)", "unitZh": "盒", "unitTh": "กล่อง", "safetyStock": 3}, {"id": "SUP-003", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "律期媒專用定量餵食器", "nameTh": "กระบอกป้อนฮอร์โมน 律期媒", "unitZh": "支", "unitTh": "อัน", "safetyStock": 3}, {"id": "SUP-004", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "MC-8023 連續注射器 1ml", "nameTh": "กระบอกฉีดยาออโต้ MC-8023 1ml", "unitZh": "支", "unitTh": "อัน", "safetyStock": 3}, {"id": "SUP-005", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "2cc 注射器", "nameTh": "กระบอกฉีดยา 2cc", "unitZh": "支", "unitTh": "อัน", "safetyStock": 3}, {"id": "SUP-006", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "1cc 注射器", "nameTh": "กระบอกฉีดยา 1cc", "unitZh": "支", "unitTh": "อัน", "safetyStock": 3}, {"id": "SUP-007", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "新易換 16G x 1-1/2\" 針頭回收盒", "nameTh": "กล่องทิ้งเข็มฉีดยา 16G x 1-1/2\"", "unitZh": "個", "unitTh": "ใบ", "safetyStock": 3}, {"id": "SUP-008", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "MSD 防疫雨鞋 (10.5號)", "nameTh": "รองเท้าบูทกันเชื้อ MSD (เบอร์ 10.5)", "unitZh": "雙", "unitTh": "คู่", "safetyStock": 3}, {"id": "SUP-009", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "MSD 防疫雨鞋 (11號)", "nameTh": "รองเท้าบูทกันเชื้อ MSD (เบอร์ 11)", "unitZh": "雙", "unitTh": "คู่", "safetyStock": 3}, {"id": "SUP-010", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "母豬藥品收納盒", "nameTh": "กล่องเก็บยาแม่พันธุ์", "unitZh": "個", "unitTh": "ใบ", "safetyStock": 3}, {"id": "SUP-011", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "防疫防水圍裙", "nameTh": "ผ้ากันเปื้อนกันน้ำสำหรับงานฟาร์ม", "unitZh": "件", "unitTh": "ผืน", "safetyStock": 3}, {"id": "SUP-012", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "5ml 塑膠注射器/針頭", "nameTh": "ชุดกระบอกฉีดยา/เข็ม 5ml (กล่อง)", "unitZh": "盒", "unitTh": "กล่อง", "safetyStock": 3}, {"id": "SUP-013", "cat": "supply", "catZh": "耗材", "catTh": "อุปกรณ์/เข็มฉีดยา", "nameZh": "精液解凍/藥品恆溫水槽", "nameTh": "อ่างควบคุมอุณหภูมิละลายน้ำเชื้อ", "unitZh": "個", "unitTh": "เครื่อง", "safetyStock": 3}];
+
+    const CATEGORIES = [
+      { key: 'all', zh: '全部 (90)', th: 'ทั้งหมด (90)' },
+      { key: 'vaccine', zh: '疫苗 (13)', th: 'วัคซีน (13)' },
+      { key: 'injection', zh: '針劑 (35)', th: 'ยาฉีด (35)' },
+      { key: 'powder', zh: '散劑 (10)', th: 'ยาผง (10)' },
+      { key: 'repro', zh: '繁殖 (7)', th: 'สืบพันธุ์ (7)' },
+      { key: 'env', zh: '環境 (12)', th: 'สิ่งแวดล้อม (12)' },
+      { key: 'supply', zh: '耗材 (13)', th: 'อุปกรณ์ (13)' }
+    ];
+
+    const I18N = {
+      zh: {
+        app_title: '牧場藥品與疫苗倉儲管理系統',
+        lang_btn: 'ภาษาไทย',
+        nav_dashboard: '庫存總覽',
+        nav_out: '現場領用',
+        nav_in: '採購入庫',
+        nav_logs: '異動紀錄',
+        kpi_total_sku: '建檔品項總數',
+        kpi_six_cats: '6 大分類完整建檔',
+        kpi_low_stock: '⚠️ 低於安全庫存',
+        kpi_click_filter: '點擊篩選需叫貨品項',
+        kpi_expiring: '⏳ 30天內即期批號',
+        kpi_fifo_hint: '優先領用避免報廢',
+        kpi_staff_count: '建檔領用人員',
+        kpi_staff_sub: '已匯入員工名單 (22人)',
+        btn_alert_only: '僅看警示品項',
+        btn_quick_init: '快速盤點修正',
+        out_title: '現場藥品／疫苗領用登記',
+        out_desc: '系統自動依「先進先出（FIFO）」帶出最早到期批號，請選擇領用人與數量。',
+        label_cat_filter: '1. 篩選類別（快速縮小範圍）',
+        label_select_item: '2. 選擇藥品／疫苗品項',
+        label_select_batch: '3. 選擇批號與效期（已依到期日排序）',
+        label_qty: '4. 領用數量',
+        label_staff: '5. 領用人員（員工名單）',
+        label_target_barn: '6. 使用棟舍／用途備註',
+        btn_confirm_out: '確認領用並扣減庫存',
+        in_title: '藥品／疫苗採購入庫登記',
+        in_desc: '登錄新進貨批號與有效期限，系統將自動納入先進先出效期追蹤。',
+        label_batch_no: '3. 廠商批號 (Lot No.)',
+        label_expiry: '4. 有效期限 (Expiry Date)',
+        label_in_qty: '5. 入庫數量',
+        label_in_staff: '6. 驗收人員',
+        label_in_type: '7. 入庫性質',
+        btn_confirm_in: '確認入庫並增加庫存',
+        logs_title: '出入庫異動流水帳',
+        logs_desc: '所有操作皆儲存於本機，可隨時匯出 Excel 相容 CSV 報表。',
+        btn_export_csv: '匯出 CSV 報表',
+        btn_reset: '重置預設值',
+        stock_label: '現有庫存',
+        safety_label: '安全水位',
+        exp_label: '最近效期',
+        status_ok: '庫存充足',
+        status_low: '庫存偏低',
+        status_exp: '30天內即期',
+        quick_out: '領用',
+        quick_in: '入庫'
+      },
+      th: {
+        app_title: 'ระบบจัดการคลังยาและวัคซีนฟาร์มสุกร',
+        lang_btn: '繁體中文',
+        nav_dashboard: 'ภาพรวมคลัง',
+        nav_out: 'เบิกใช้ยา',
+        nav_in: 'รับยาเข้าคลัง',
+        nav_logs: 'ประวัติรับ-จ่าย',
+        kpi_total_sku: 'รายการยาทั้งหมด',
+        kpi_six_cats: 'ครบ 6 หมวดหมู่หลัก',
+        kpi_low_stock: '⚠️ สต็อกต่ำกว่าเกณฑ์',
+        kpi_click_filter: 'กดเพื่อดูรายการต้องสั่งซื้อ',
+        kpi_expiring: '⏳ ใกล้หมดอายุใน 30 วัน',
+        kpi_fifo_hint: 'เบิกใช้ก่อน (FIFO)',
+        kpi_staff_count: 'รายชื่อพนักงาน',
+        kpi_staff_sub: 'นำเข้าข้อมูลแล้ว 22 คน',
+        btn_alert_only: 'ดูเฉพาะรายการแจ้งเตือน',
+        btn_quick_init: 'ปรับยอดตรวจนับ',
+        out_title: 'บันทึกการเบิกใช้ยาและวัคซีน',
+        out_desc: 'ระบบเรียงล็อตที่หมดอายุก่อนอัตโนมัติ (FIFO) กรุณาเลือกชื่อผู้เบิกและจำนวน',
+        label_cat_filter: '1. เลือกหมวดหมู่',
+        label_select_item: '2. เลือกรายการยา / วัคซีน',
+        label_select_batch: '3. เลือกล็อตและวันหมดอายุ (เรียงตามวันหมดอายุ)',
+        label_qty: '4. จำนวนที่เบิก',
+        label_staff: '5. ชื่อผู้เบิก (พนักงาน)',
+        label_target_barn: '6. โรงเรือนที่นำไปใช้',
+        btn_confirm_out: 'ยืนยันการเบิกและตัดสต็อก',
+        in_title: 'บันทึกรับยา / วัคซีนเข้าคลัง',
+        in_desc: 'ระบุเลขล็อตและวันหมดอายุ เพื่อติดตามระบบเบิกก่อน-หลัง (FIFO)',
+        label_batch_no: '3. เลขที่ล็อต (Lot No.)',
+        label_expiry: '4. วันหมดอายุ (Expiry Date)',
+        label_in_qty: '5. จำนวนที่รับเข้า',
+        label_in_staff: '6. ผู้ตรวจรับ',
+        label_in_type: '7. ประเภทการรับเข้า',
+        btn_confirm_in: 'ยืนยันการรับเข้าคลัง',
+        logs_title: 'ประวัติการรับเข้า-เบิกออก',
+        logs_desc: 'บันทึกข้อมูลในเครื่องอัตโนมัติ สามารถส่งออกเป็นไฟล์ CSV เปิดใน Excel ได้',
+        btn_export_csv: 'ส่งออกไฟล์ CSV',
+        btn_reset: 'รีเซ็ตข้อมูลเริ่มต้น',
+        stock_label: 'คงเหลือ',
+        safety_label: 'จุดสั่งซื้อ',
+        exp_label: 'หมดอายุ',
+        status_ok: 'ปกติ',
+        status_low: 'สต็อกต่ำ',
+        status_exp: 'ใกล้หมดอายุ',
+        quick_out: 'เบิกใช้',
+        quick_in: 'รับเข้า'
+      }
+    };
+
+    // ==========================================
+    // 2. STATE & STORAGE MANAGEMENT
+    // ==========================================
+    const STORAGE_KEY_BATCHES = 'xulian_vet_wms_batches_v2';
+    const STORAGE_KEY_LOGS = 'xulian_vet_wms_logs_v2';
+
+    let currentLang = 'zh';
+    let selectedCat = 'all';
+    let alertOnly = false;
+    let batches = [];
+    let logs = [];
+
+    function getFutureDate(days) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    }
+
+    function initDefaultBatches() {
+      // Seed realistic initial batches for all 90 items, with a couple of alerts for immediate visibility
+      const seeded = [];
+      MASTER_ITEMS.forEach((item, idx) => {
+        let qty = item.safetyStock * 2;
+        let expDays = 240 + (idx % 6) * 30;
+        let lot = `LOT-26${String((idx % 11) + 1).padStart(2, '0')}A`;
+
+        // Create realistic demo alerts on key items
+        if (item.id === 'VAC-001') {
+          // Fostera PRRS: one expiring soon batch + one fresh batch
+          seeded.push({
+            batchId: 'B-' + item.id + '-1',
+            itemId: item.id,
+            lot: 'PRRS-2605A',
+            expiry: getFutureDate(18),
+            qty: 12
+          });
+          seeded.push({
+            batchId: 'B-' + item.id + '-2',
+            itemId: item.id,
+            lot: 'PRRS-2611B',
+            expiry: getFutureDate(310),
+            qty: 45
+          });
+          return;
+        }
+        if (item.id === 'INJ-001') {
+          // 益瑞信福: low stock example
+          qty = 4;
+        }
+        if (item.id === 'INJ-025') {
+          // 鐵球寧: high usage item
+          qty = 28;
+        }
+        if (item.id === 'ENV-003' || item.id === 'ENV-004') {
+          // 槽車散裝 KG
+          qty = 3500;
+        }
+
+        seeded.push({
+          batchId: 'B-' + item.id + '-1',
+          itemId: item.id,
+          lot: lot,
+          expiry: getFutureDate(expDays),
+          qty: qty
+        });
+      });
+      return seeded;
+    }
+
+    function loadState() {
+      const savedBatches = localStorage.getItem(STORAGE_KEY_BATCHES);
+      const savedLogs = localStorage.getItem(STORAGE_KEY_LOGS);
+      if (savedBatches) {
+        batches = JSON.parse(savedBatches);
+      } else {
+        batches = initDefaultBatches();
+        saveState();
+      }
+      logs = savedLogs ? JSON.parse(savedLogs) : [
+        {
+          id: 'LOG-INIT-1',
+          time: new Date().toLocaleString('zh-TW', { hour12: false }),
+          type: 'IN',
+          itemId: 'VAC-001',
+          lot: 'PRRS-2611B',
+          qty: 45,
+          staff: '周豐益',
+          note: '115年11月採購入庫'
+        },
+        {
+          id: 'LOG-INIT-2',
+          time: new Date().toLocaleString('zh-TW', { hour12: false }),
+          type: 'OUT',
+          itemId: 'INJ-025',
+          lot: 'LOT-2603A',
+          qty: 2,
+          staff: '李昭和',
+          note: '分娩舍'
+        }
+      ];
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY_BATCHES, JSON.stringify(batches));
+      localStorage.setItem(STORAGE_KEY_LOGS, JSON.stringify(logs));
+    }
+
+    function resetDemoData() {
+      if (!confirm(currentLang === 'zh' ? '確定要重置所有庫存與異動紀錄為初始預設值嗎？' : 'ต้องการรีเซ็ตข้อมูลทั้งหมดกลับเป็นค่าเริ่มต้นหรือไม่?')) return;
+      localStorage.removeItem(STORAGE_KEY_BATCHES);
+      localStorage.removeItem(STORAGE_KEY_LOGS);
+      loadState();
+      refreshAll();
+      showToast(currentLang === 'zh' ? '✅ 已重置為初始庫存資料' : '✅ รีเซ็ตข้อมูลเรียบร้อยแล้ว');
+    }
+
+    // ==========================================
+    // 3. HELPER CALCULATIONS
+    // ==========================================
+    function daysUntil(dateStr) {
+      if (!dateStr) return 999;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const target = new Date(dateStr);
+      return Math.ceil((target - today) / (1000 * 60 * 60 * 24));
+    }
+
+    function getItemStats(item) {
+      const itemBatches = batches
+        .filter(b => b.itemId === item.id && b.qty > 0)
+        .sort((a, b) => a.expiry.localeCompare(b.expiry));
+      const totalQty = itemBatches.reduce((sum, b) => sum + Number(b.qty), 0);
+      const earliestBatch = itemBatches.length > 0 ? itemBatches[0] : null;
+      const minDays = earliestBatch ? daysUntil(earliestBatch.expiry) : 999;
+      const isLow = totalQty < item.safetyStock;
+      const isExpiring = earliestBatch !== null && minDays <= 30;
+      return { itemBatches, totalQty, earliestBatch, minDays, isLow, isExpiring };
+    }
+
+    // ==========================================
+    // 4. UI RENDERING
+    // ==========================================
+    function toggleLang() {
+      currentLang = currentLang === 'zh' ? 'th' : 'zh';
+      applyTranslations();
+      refreshAll();
+    }
+
+    function applyTranslations() {
+      const dict = I18N[currentLang];
+      document.getElementById('app-title').textContent = dict.app_title;
+      document.getElementById('lang-label').textContent = dict.lang_btn;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) el.textContent = dict[key];
+      });
+      document.getElementById('search-input').placeholder = currentLang === 'zh'
+        ? '搜尋品名、編號（如 PRRS、信福、鐵球寧、VAC-001）...'
+        : 'ค้นหาชื่อยา หรือรหัส (เช่น PRRS, VAC-001)...';
+    }
+
+    function switchTab(tabName) {
+      ['dashboard', 'out', 'in', 'logs'].forEach(t => {
+        document.getElementById('view-' + t).classList.toggle('hidden', t !== tabName);
+        const btn = document.getElementById('tab-' + t);
+        if (t === tabName) {
+          btn.classList.add('tab-active');
+          btn.classList.remove('text-teal-100');
+        } else {
+          btn.classList.remove('tab-active');
+          btn.classList.add('text-teal-100');
+        }
+      });
+      if (tabName === 'out') {
+        populateItemDropdown('out');
+      } else if (tabName === 'in') {
+        populateItemDropdown('in');
+      } else if (tabName === 'logs') {
+        renderLogs();
+      }
+    }
+
+    function renderCategoryPills() {
+      const container = document.getElementById('cat-pills');
+      container.innerHTML = CATEGORIES.map(c => {
+        const active = selectedCat === c.key;
+        const label = currentLang === 'zh' ? c.zh : c.th;
+        return `<button onclick="selectCategory('${c.key}')"
+          class="btn-press px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+            active ? 'bg-teal-700 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }">${label}</button>`;
+      }).join('');
+    }
+
+    function selectCategory(catKey) {
+      selectedCat = catKey;
+      renderCategoryPills();
+      renderInventory();
+    }
+
+    function toggleAlertOnly() {
+      alertOnly = !alertOnly;
+      const btn = document.getElementById('alert-only-btn');
+      if (alertOnly) {
+        btn.classList.remove('bg-slate-50', 'text-slate-700', 'border-slate-300');
+        btn.classList.add('bg-rose-600', 'text-white', 'border-rose-600');
+      } else {
+        btn.classList.add('bg-slate-50', 'text-slate-700', 'border-slate-300');
+        btn.classList.remove('bg-rose-600', 'text-white', 'border-rose-600');
+      }
+      renderInventory();
+    }
+
+    function filterByAlert(mode) {
+      switchTab('dashboard');
+      if (mode === 'all') {
+        alertOnly = false;
+        selectedCat = 'all';
+      } else {
+        alertOnly = true;
+      }
+      const btn = document.getElementById('alert-only-btn');
+      btn.className = alertOnly
+        ? 'btn-press px-3 py-2 rounded-xl text-xs font-bold border bg-rose-600 text-white border-rose-600 whitespace-nowrap'
+        : 'btn-press px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-slate-50 text-slate-700 whitespace-nowrap';
+      renderCategoryPills();
+      renderInventory();
+    }
+
+    function updateKPIs() {
+      let lowCount = 0;
+      let expCount = 0;
+      MASTER_ITEMS.forEach(item => {
+        const st = getItemStats(item);
+        if (st.isLow) lowCount++;
+        if (st.isExpiring) expCount++;
+      });
+      document.getElementById('kpi-sku').textContent = MASTER_ITEMS.length;
+      document.getElementById('kpi-low').textContent = lowCount;
+      document.getElementById('kpi-exp').textContent = expCount;
+      document.getElementById('kpi-staff').textContent = EMPLOYEES.length;
+    }
+
+    function renderInventory() {
+      const dict = I18N[currentLang];
+      const keyword = document.getElementById('search-input').value.trim().toLowerCase();
+      const container = document.getElementById('inventory-list');
+
+      const filtered = MASTER_ITEMS.filter(item => {
+        if (selectedCat !== 'all' && item.cat !== selectedCat) return false;
+        const st = getItemStats(item);
+        if (alertOnly && !st.isLow && !st.isExpiring) return false;
+        if (keyword) {
+          const hay = `${item.id} ${item.nameZh} ${item.nameTh} ${item.catZh}`.toLowerCase();
+          if (!hay.includes(keyword)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="col-span-full bg-white p-8 rounded-2xl text-center text-slate-400 font-bold border border-slate-200">
+          ${currentLang === 'zh' ? '查無符合條件的藥品或疫苗品項' : 'ไม่พบรายการยาที่ค้นหา'}
+        </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const st = getItemStats(item);
+        const primaryName = currentLang === 'zh' ? item.nameZh : item.nameTh;
+        const secondaryName = currentLang === 'zh' ? item.nameTh : item.nameZh;
+        const unitLabel = currentLang === 'zh' ? item.unitZh : item.unitTh;
+        const catLabel = currentLang === 'zh' ? item.catZh : item.catTh;
+
+        let borderClass = 'border-slate-200';
+        let badges = `<span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold px-2 py-0.5 rounded-full">${dict.status_ok}</span>`;
+        if (st.isLow && st.isExpiring) {
+          borderClass = 'border-rose-400 ring-1 ring-rose-200';
+          badges = `<span class="bg-rose-100 text-rose-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${dict.status_low}</span>
+                    <span class="bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${dict.status_exp} (${st.minDays}d)</span>`;
+        } else if (st.isLow) {
+          borderClass = 'border-rose-300';
+          badges = `<span class="bg-rose-100 text-rose-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${dict.status_low}</span>`;
+        } else if (st.isExpiring) {
+          borderClass = 'border-amber-300';
+          badges = `<span class="bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">${dict.status_exp} (${st.minDays}d)</span>`;
+        }
+
+        const expText = st.earliestBatch
+          ? `${st.earliestBatch.expiry} (${st.earliestBatch.lot})`
+          : '-';
+
+        return `
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border ${borderClass} flex flex-col justify-between gap-2.5">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-[11px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">${item.id}</span>
+                  <span class="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded">${catLabel}</span>
+                </div>
+                <div class="flex items-center gap-1 flex-wrap justify-end">${badges}</div>
+              </div>
+              <h3 class="font-extrabold text-sm sm:text-base text-slate-900 leading-snug">${primaryName}</h3>
+              <p class="text-xs text-slate-500 mt-0.5">${secondaryName}</p>
+            </div>
+
+            <div class="bg-slate-50 rounded-xl p-2.5 flex items-center justify-between border border-slate-100">
+              <div>
+                <div class="text-[11px] text-slate-500">${dict.stock_label} / ${dict.safety_label}</div>
+                <div class="flex items-baseline gap-1.5">
+                  <span class="text-xl font-black ${st.isLow ? 'text-rose-600' : 'text-teal-800'}">${Number(st.totalQty.toFixed(2))}</span>
+                  <span class="text-xs font-bold text-slate-600">${unitLabel}</span>
+                  <span class="text-[11px] text-slate-400">/ ${item.safetyStock} ${unitLabel}</span>
+                </div>
+                <div class="text-[11px] ${st.isExpiring ? 'text-amber-700 font-bold' : 'text-slate-500'} mt-0.5">
+                  ${dict.exp_label}: ${expText}
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1.5">
+                <button onclick="quickAction('out', '${item.id}')"
+                  class="btn-press px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow-sm">
+                  📤 ${dict.quick_out}
+                </button>
+                <button onclick="quickAction('in', '${item.id}')"
+                  class="btn-press px-3 py-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-lg shadow-sm">
+                  📥 ${dict.quick_in}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // 5. FORM DROPDOWNS & ACTIONS
+    // ==========================================
+    function populateEmployeeSelects() {
+      const optionsHtml = EMPLOYEES.map(name => `<option value="${name}">${name}</option>`).join('');
+      document.getElementById('out-staff-select').innerHTML = optionsHtml;
+      document.getElementById('in-staff-select').innerHTML = optionsHtml;
+      document.getElementById('st-staff-select').innerHTML = optionsHtml;
+    }
+
+    function populateCategorySelects() {
+      const optionsHtml = CATEGORIES.map(c => {
+        const label = currentLang === 'zh' ? c.zh : c.th;
+        return `<option value="${c.key}">${label}</option>`;
+      }).join('');
+      document.getElementById('out-cat-select').innerHTML = optionsHtml;
+      document.getElementById('in-cat-select').innerHTML = optionsHtml;
+    }
+
+    function populateItemDropdown(mode, preselectItemId = null) {
+      const catVal = document.getElementById(mode + '-cat-select').value;
+      const selectEl = document.getElementById(mode + '-item-select');
+      const items = MASTER_ITEMS.filter(it => catVal === 'all' || it.cat === catVal);
+
+      selectEl.innerHTML = items.map(it => {
+        const st = getItemStats(it);
+        const name = currentLang === 'zh' ? `${it.id}｜${it.nameZh}` : `${it.id}｜${it.nameTh}`;
+        const unit = currentLang === 'zh' ? it.unitZh : it.unitTh;
+        return `<option value="${it.id}">${name} (${Number(st.totalQty.toFixed(2))} ${unit})</option>`;
+      }).join('');
+
+      if (preselectItemId) {
+        selectEl.value = preselectItemId;
+      }
+
+      if (mode === 'out') {
+        onOutItemChange();
+      } else {
+        updateInUnitHint();
+      }
+    }
+
+    function quickAction(mode, itemId) {
+      const item = MASTER_ITEMS.find(i => i.id === itemId);
+      if (!item) return;
+      switchTab(mode);
+      document.getElementById(mode + '-cat-select').value = 'all';
+      populateItemDropdown(mode, itemId);
+    }
+
+    function onOutItemChange() {
+      const itemId = document.getElementById('out-item-select').value;
+      const item = MASTER_ITEMS.find(i => i.id === itemId);
+      const batchSelect = document.getElementById('out-batch-select');
+      if (!item) return;
+
+      const unit = currentLang === 'zh' ? item.unitZh : item.unitTh;
+      const validBatches = batches
+        .filter(b => b.itemId === itemId && b.qty > 0)
+        .sort((a, b) => a.expiry.localeCompare(b.expiry));
+
+      if (validBatches.length === 0) {
+        batchSelect.innerHTML = `<option value="">${currentLang === 'zh' ? '⚠️ 目前無可用庫存批號' : '⚠️ ไม่มีสต็อกคงเหลือ'}</option>`;
+      } else {
+        batchSelect.innerHTML = validBatches.map((b, i) => {
+          const fifoTag = i === 0 ? (currentLang === 'zh' ? '【建議優先領用】' : '【เบิกก่อน FIFO】') : '';
+          return `<option value="${b.batchId}">${fifoTag} 批號: ${b.lot}｜效期: ${b.expiry}｜餘量: ${Number(b.qty.toFixed(2))} ${unit}</option>`;
+        }).join('');
+      }
+      updateOutMaxHint();
+    }
+
+    function updateOutMaxHint() {
+      const batchId = document.getElementById('out-batch-select').value;
+      const b = batches.find(x => x.batchId === batchId);
+      const item = MASTER_ITEMS.find(i => i.id === document.getElementById('out-item-select').value);
+      const hintEl = document.getElementById('out-stock-hint');
+      if (!b || !item) {
+        hintEl.textContent = currentLang === 'zh' ? '目前庫存為 0，無法領用' : 'สินค้าหมด ไม่สามารถเบิกได้';
+        return;
+      }
+      const unit = currentLang === 'zh' ? item.unitZh : item.unitTh;
+      hintEl.textContent = currentLang === 'zh'
+        ? `該批號可領用上限：${Number(b.qty.toFixed(2))} ${unit}（計量單位：${item.unitZh}）`
+        : `เบิกได้สูงสุด: ${Number(b.qty.toFixed(2))} ${unit}`;
+    }
+
+    function updateInUnitHint() {
+      const item = MASTER_ITEMS.find(i => i.id === document.getElementById('in-item-select').value);
+      if (!item) return;
+      const unit = currentLang === 'zh' ? item.unitZh : item.unitTh;
+      document.getElementById('in-unit-hint').textContent = currentLang === 'zh'
+        ? `計量單位：${unit}（安全庫存水位：${item.safetyStock} ${unit}）`
+        : `หน่วยนับ: ${unit} (จุดสั่งซื้อ: ${item.safetyStock} ${unit})`;
+    }
+
+    function adjustQty(inputId, delta) {
+      const el = document.getElementById(inputId);
+      let val = parseFloat(el.value) || 0;
+      val = Math.max(0.1, Math.round((val + delta) * 100) / 100);
+      el.value = val;
+    }
+
+    function submitOutbound() {
+      const itemId = document.getElementById('out-item-select').value;
+      const batchId = document.getElementById('out-batch-select').value;
+      const qty = parseFloat(document.getElementById('out-qty').value);
+      const staff = document.getElementById('out-staff-select').value;
+      const barn = document.getElementById('out-barn-select').value;
+
+      const item = MASTER_ITEMS.find(i => i.id === itemId);
+      const batch = batches.find(b => b.batchId === batchId);
+
+      if (!item || !batch) {
+        showToast(currentLang === 'zh' ? '⚠️ 請選擇有效的有庫存批號' : '⚠️ กรุณาเลือกล็อตที่มีสินค้า');
+        return;
+      }
+      if (!qty || qty <= 0) {
+        showToast(currentLang === 'zh' ? '⚠️ 請輸入大於 0 的領用數量' : '⚠️ กรุณาระบุจำนวนที่ถูกต้อง');
+        return;
+      }
+      if (qty > batch.qty + 1e-6) {
+        showToast(currentLang === 'zh'
+          ? `❌ 領用數量 (${qty}) 超過該批號餘量 (${batch.qty})！`
+          : `❌ จำนวนเบิกเกินสต็อกคงเหลือ (${batch.qty})`);
+        return;
+      }
+
+      batch.qty = Math.round((batch.qty - qty) * 100) / 100;
+      logs.unshift({
+        id: 'LOG-' + Date.now(),
+        time: new Date().toLocaleString('zh-TW', { hour12: false }),
+        type: 'OUT',
+        itemId: item.id,
+        lot: batch.lot,
+        qty: qty,
+        staff: staff,
+        note: barn
+      });
+
+      saveState();
+      refreshAll();
+      onOutItemChange();
+      showToast(currentLang === 'zh'
+        ? `✅ ${staff} 已領用 ${item.nameZh} ${qty}${item.unitZh}`
+        : `✅ บันทึกการเบิก ${qty} ${item.unitTh} เรียบร้อย`);
+    }
+
+    function submitInbound() {
+      const itemId = document.getElementById('in-item-select').value;
+      const lot = document.getElementById('in-batch').value.trim() || `LOT-${new Date().toISOString().slice(2,10).replace(/-/g,'')}`;
+      const expiry = document.getElementById('in-expiry').value || getFutureDate(365);
+      const qty = parseFloat(document.getElementById('in-qty').value);
+      const staff = document.getElementById('in-staff-select').value;
+      const inType = document.getElementById('in-type-select').value;
+
+      const item = MASTER_ITEMS.find(i => i.id === itemId);
+      if (!item || !qty || qty <= 0) {
+        showToast(currentLang === 'zh' ? '⚠️ 請確認入庫品項與數量' : '⚠️ กรุณาตรวจสอบข้อมูลรับเข้า');
+        return;
+      }
+
+      const existing = batches.find(b => b.itemId === itemId && b.lot === lot && b.expiry === expiry);
+      if (existing) {
+        existing.qty = Math.round((existing.qty + qty) * 100) / 100;
+      } else {
+        batches.push({
+          batchId: 'B-' + Date.now(),
+          itemId: itemId,
+          lot: lot,
+          expiry: expiry,
+          qty: qty
+        });
+      }
+
+      logs.unshift({
+        id: 'LOG-' + Date.now(),
+        time: new Date().toLocaleString('zh-TW', { hour12: false }),
+        type: 'IN',
+        itemId: item.id,
+        lot: lot,
+        qty: qty,
+        staff: staff,
+        note: inType
+      });
+
+      saveState();
+      refreshAll();
+      populateItemDropdown('in', itemId);
+      showToast(currentLang === 'zh'
+        ? `📥 已入庫 ${item.nameZh} +${qty}${item.unitZh}`
+        : `📥 รับเข้าคลัง +${qty} ${item.unitTh} เรียบร้อย`);
+    }
+
+    // ==========================================
+    // 6. STOCKTAKE MODAL
+    // ==========================================
+    function openStocktakeModal() {
+      const sel = document.getElementById('st-item-select');
+      sel.innerHTML = MASTER_ITEMS.map(it => `<option value="${it.id}">${it.id}｜${it.nameZh}</option>`).join('');
+      onStItemChange();
+      document.getElementById('stocktake-modal').classList.remove('hidden');
+    }
+
+    function closeStocktakeModal() {
+      document.getElementById('stocktake-modal').classList.add('hidden');
+    }
+
+    function onStItemChange() {
+      const itemId = document.getElementById('st-item-select').value;
+      const itemBatches = batches.filter(b => b.itemId === itemId);
+      const bSel = document.getElementById('st-batch-select');
+      bSel.innerHTML = itemBatches.map(b => `<option value="${b.batchId}">批號 ${b.lot} (效期 ${b.expiry}｜原帳面 ${b.qty})</option>`).join('');
+      if (itemBatches.length > 0) {
+        document.getElementById('st-qty').value = itemBatches[0].qty;
+      }
+    }
+
+    function submitStocktake() {
+      const itemId = document.getElementById('st-item-select').value;
+      const batchId = document.getElementById('st-batch-select').value;
+      const newQty = parseFloat(document.getElementById('st-qty').value);
+      const staff = document.getElementById('st-staff-select').value;
+      const item = MASTER_ITEMS.find(i => i.id === itemId);
+      const batch = batches.find(b => b.batchId === batchId);
+
+      if (!item || !batch || isNaN(newQty) || newQty < 0) return;
+      const diff = Math.round((newQty - batch.qty) * 100) / 100;
+      batch.qty = newQty;
+
+      logs.unshift({
+        id: 'LOG-' + Date.now(),
+        time: new Date().toLocaleString('zh-TW', { hour12: false }),
+        type: 'ADJ',
+        itemId: item.id,
+        lot: batch.lot,
+        qty: diff,
+        staff: staff,
+        note: `盤點修正為 ${newQty}${item.unitZh}`
+      });
+
+      saveState();
+      refreshAll();
+      closeStocktakeModal();
+      showToast(`✅ 已更新 ${item.nameZh} 盤點數量為 ${newQty}${item.unitZh}`);
+    }
+
+    // ==========================================
+    // 7. LOGS & CSV EXPORT
+    // ==========================================
+    function renderLogs() {
+      const container = document.getElementById('logs-container');
+      if (logs.length === 0) {
+        container.innerHTML = `<div class="bg-white p-6 rounded-2xl text-center text-slate-400">尚無異動紀錄</div>`;
+        return;
+      }
+      container.innerHTML = logs.map(log => {
+        const item = MASTER_ITEMS.find(i => i.id === log.itemId) || { nameZh: log.itemId, nameTh: log.itemId, unitZh: '', unitTh: '' };
+        const name = currentLang === 'zh' ? item.nameZh : item.nameTh;
+        const unit = currentLang === 'zh' ? item.unitZh : item.unitTh;
+
+        let badge = '';
+        let qtyText = '';
+        if (log.type === 'OUT') {
+          badge = `<span class="bg-rose-100 text-rose-800 text-xs font-black px-2 py-0.5 rounded">領用 OUT</span>`;
+          qtyText = `<span class="text-rose-600 font-black">-${log.qty} ${unit}</span>`;
+        } else if (log.type === 'IN') {
+          badge = `<span class="bg-teal-100 text-teal-800 text-xs font-black px-2 py-0.5 rounded">入庫 IN</span>`;
+          qtyText = `<span class="text-teal-700 font-black">+${log.qty} ${unit}</span>`;
+        } else {
+          badge = `<span class="bg-amber-100 text-amber-800 text-xs font-black px-2 py-0.5 rounded">盤點 ADJ</span>`;
+          qtyText = `<span class="text-amber-700 font-black">${log.qty >= 0 ? '+' : ''}${log.qty} ${unit}</span>`;
+        }
+
+        return `
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-3">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                ${badge}
+                <span class="font-extrabold text-sm text-slate-900">${name}</span>
+              </div>
+              <div class="text-xs text-slate-500">
+                👤 <strong class="text-slate-700">${log.staff}</strong> ｜ 🏷️ ${log.lot} ｜ 📍 ${log.note}
+              </div>
+              <div class="text-[11px] text-slate-400">${log.time}</div>
+            </div>
+            <div class="text-right text-base whitespace-nowrap">${qtyText}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function exportCSV() {
+      const headers = ['時間', '異動類型', '品項編號', '品項名稱', '批號', '異動數量', '單位', '操作人員', '備註/棟舍'];
+      const rows = logs.map(l => {
+        const item = MASTER_ITEMS.find(i => i.id === l.itemId) || { nameZh: l.itemId, unitZh: '' };
+        const typeStr = l.type === 'OUT' ? '領用' : (l.type === 'IN' ? '入庫' : '盤點修正');
+        return [l.time, typeStr, l.itemId, item.nameZh, l.lot, l.qty, item.unitZh, l.staff, l.note]
+          .map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+      });
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `牧場藥品疫苗倉儲異動紀錄_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('opacity-0');
+      setTimeout(() => t.classList.add('opacity-0'), 2600);
+    }
+
+    function refreshAll() {
+      updateKPIs();
+      renderCategoryPills();
+      renderInventory();
+      populateCategorySelects();
+      populateEmployeeSelects();
+      renderLogs();
+    }
+
+    // Boot
+    document.getElementById('in-expiry').value = getFutureDate(365);
+    loadState();
+    applyTranslations();
+    refreshAll();
+    populateItemDropdown('out');
+    populateItemDropdown('in');
+  </script>
+</body>
+</html>
